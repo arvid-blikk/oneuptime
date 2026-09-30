@@ -8,6 +8,7 @@ import {
   appendAttributeValuesPrefilter,
 } from "../Utils/AnalyticsDatabase/AttributeFilterStatement";
 import { getQuerySettings } from "../Utils/AnalyticsDatabase/QuerySettingsHelper";
+import { readJSONResponse } from "../Utils/AnalyticsDatabase/QueryResponse";
 import LogDatabaseService from "./LogService";
 import TableColumnType from "../../Types/AnalyticsDatabase/TableColumnType";
 import { JSONObject, ObjectType } from "../../Types/JSON";
@@ -302,12 +303,8 @@ export class LogAggregationService {
     const statement: Statement =
       LogAggregationService.buildHistogramStatement(request);
 
-    const dbResult: Results = await LogDatabaseService.executeQuery(statement);
-    const response: DbJSONResponse = await dbResult.json<{
-      data?: Array<JSONObject>;
-    }>();
-
-    const rows: Array<JSONObject> = response.data || [];
+    const rows: Array<JSONObject> =
+      await LogAggregationService.runQuery(statement);
 
     return rows.map((row: JSONObject): HistogramBucket => {
       return {
@@ -325,12 +322,8 @@ export class LogAggregationService {
     const statement: Statement =
       LogAggregationService.buildFacetStatement(request);
 
-    const dbResult: Results = await LogDatabaseService.executeQuery(statement);
-    const response: DbJSONResponse = await dbResult.json<{
-      data?: Array<JSONObject>;
-    }>();
-
-    const rows: Array<JSONObject> = response.data || [];
+    const rows: Array<JSONObject> =
+      await LogAggregationService.runQuery(statement);
 
     return rows
       .map((row: JSONObject): FacetValue => {
@@ -544,12 +537,8 @@ export class LogAggregationService {
     const statement: Statement =
       LogAggregationService.buildAnalyticsTimeseriesStatement(request);
 
-    const dbResult: Results = await LogDatabaseService.executeQuery(statement);
-    const response: DbJSONResponse = await dbResult.json<{
-      data?: Array<JSONObject>;
-    }>();
-
-    const rows: Array<JSONObject> = response.data || [];
+    const rows: Array<JSONObject> =
+      await LogAggregationService.runQuery(statement);
     const groupByKeys: Array<string> = request.groupBy || [];
 
     return rows.map((row: JSONObject): AnalyticsTimeseriesRow => {
@@ -581,12 +570,8 @@ export class LogAggregationService {
     const statement: Statement =
       LogAggregationService.buildAnalyticsTopListStatement(request);
 
-    const dbResult: Results = await LogDatabaseService.executeQuery(statement);
-    const response: DbJSONResponse = await dbResult.json<{
-      data?: Array<JSONObject>;
-    }>();
-
-    const rows: Array<JSONObject> = response.data || [];
+    const rows: Array<JSONObject> =
+      await LogAggregationService.runQuery(statement);
 
     return rows
       .map((row: JSONObject): AnalyticsTopItem => {
@@ -613,12 +598,8 @@ export class LogAggregationService {
     const statement: Statement =
       LogAggregationService.buildAnalyticsTableStatement(request);
 
-    const dbResult: Results = await LogDatabaseService.executeQuery(statement);
-    const response: DbJSONResponse = await dbResult.json<{
-      data?: Array<JSONObject>;
-    }>();
-
-    const rows: Array<JSONObject> = response.data || [];
+    const rows: Array<JSONObject> =
+      await LogAggregationService.runQuery(statement);
     const groupByKeys: Array<string> = request.groupBy;
 
     return rows.map((row: JSONObject): AnalyticsTableRow => {
@@ -1171,12 +1152,7 @@ export class LogAggregationService {
       }),
     );
 
-    const dbResult: Results = await LogDatabaseService.executeQuery(statement);
-    const response: DbJSONResponse = await dbResult.json<{
-      data?: Array<JSONObject>;
-    }>();
-
-    return response.data || [];
+    return LogAggregationService.runQuery(statement, "The log export");
   }
 
   @CaptureSpan()
@@ -1387,20 +1363,16 @@ export class LogAggregationService {
       }),
     );
 
-    const [totalResult, matchResult] = await Promise.all([
-      LogDatabaseService.executeQuery(totalStatement),
-      LogDatabaseService.executeQuery(matchStatement),
+    const [totalData, matchData] = await Promise.all([
+      LogAggregationService.runQuery(
+        totalStatement,
+        "The drop filter estimate",
+      ),
+      LogAggregationService.runQuery(
+        matchStatement,
+        "The drop filter estimate",
+      ),
     ]);
-
-    const totalResponse: DbJSONResponse = await totalResult.json<{
-      data?: Array<JSONObject>;
-    }>();
-    const matchResponse: DbJSONResponse = await matchResult.json<{
-      data?: Array<JSONObject>;
-    }>();
-
-    const totalData: Array<JSONObject> = totalResponse.data || [];
-    const matchData: Array<JSONObject> = matchResponse.data || [];
 
     const totalLogs: number = Number(totalData[0]?.["cnt"] || 0);
     const matchingLogs: number = Number(matchData[0]?.["cnt"] || 0);
@@ -1641,11 +1613,12 @@ export class LogAggregationService {
 
   private static async runQuery(
     statement: Statement,
+    subject: string = "The log query",
   ): Promise<Array<JSONObject>> {
     const dbResult: Results = await LogDatabaseService.executeQuery(statement);
-    const response: DbJSONResponse = await dbResult.json<{
+    const response: DbJSONResponse = await readJSONResponse<{
       data?: Array<JSONObject>;
-    }>();
+    }>({ resultSet: dbResult, subject });
 
     return response.data || [];
   }
