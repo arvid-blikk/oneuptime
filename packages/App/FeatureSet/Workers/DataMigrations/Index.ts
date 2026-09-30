@@ -119,6 +119,7 @@ import ScheduleRemindersMissedByReminderRuleLookup from "./ScheduleRemindersMiss
 import RepairKubernetesDashboardClusterCpuTile from "./RepairKubernetesDashboardClusterCpuTile";
 import BackfillStatusPageSubscriberUnsubscribeColumns from "./BackfillStatusPageSubscriberUnsubscribeColumns";
 import BackfillIncidentCustomFieldVariableKeys from "./BackfillIncidentCustomFieldVariableKeys";
+import MaterializeAttributeValuesIndexOnLogTable from "./MaterializeAttributeValuesIndexOnLogTable";
 
 // This is the order in which the migrations will be run. Add new migrations to the end of the array.
 
@@ -531,6 +532,14 @@ const DataMigrations: Array<DataMigrationBase> = [
    * Idempotent: it only fills an empty key.
    */
   new BackfillIncidentCustomFieldVariableKeys(),
+  /*
+   * Builds idx_attribute_values (bloom filter over log attribute values) for
+   * log parts written before boot schema-sync added it, so attribute-filtered
+   * log searches skip old granules too instead of timing out on long time
+   * ranges. Background mutation; best-effort, never halts the chain.
+   * Idempotent.
+   */
+  new MaterializeAttributeValuesIndexOnLogTable(),
 ];
 
 export default DataMigrations;
